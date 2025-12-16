@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: todo-fastapi-app
+    env: python
+    region: oregon
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port 10000"
+    envVars:
+      - key: SQLALCHEMY_DATABASE_URL
+        fromDatabase:
+          name: app_e5dm
+          property: connectionString
