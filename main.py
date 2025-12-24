@@ -60,6 +60,11 @@ async def read_root(request: Request):
     """A simple health check endpoint."""
     return {"status": "ok"}
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Kubernetes probes."""
+    return {"status": "ok", "service": "todo-backend"}
+
 from utils.api_monitor import api_monitor
 
 @app.get("/api/admin/stats")

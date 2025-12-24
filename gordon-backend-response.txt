@@ -1,0 +1,5 @@
+Hello! I've started containerizing your project. I'll be analyzing your project structure and generating the necessary Docker assets to help you get up and running smoothly. Let's get started!
+
+Hello! I've started containerizing your project. I'll be analyzing your project structure and generating the necessary Docker assets to help you get up and running smoothly. Let's get started!
+
+Hi there! It looks like no services have been detected. Let me know if you'd like help with anything else!
