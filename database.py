@@ -6,21 +6,31 @@ from models import Base
 import logging
 
 logger = logging.getLogger("app")
-password = os.getenv("PASSWORD")
-# URL-encode the password
-password = quote_plus(os.environ.get("DB_PASSWORD", "Qir@t_S2eed123"))
 
-# Get database host and port from environment variables, with defaults
-DB_HOST = os.environ.get("DB_HOST", "localhost")
-DB_PORT = os.environ.get("DB_PORT", "5433") # Default to 5433
+# Check if full database URL is provided (e.g., from Render, Heroku)
+DATABASE_URL = os.environ.get("SQLALCHEMY_DATABASE_URL") or os.environ.get("DATABASE_URL")
 
-# Construct the default DATABASE_URL using environment variables
-DEFAULT_DATABASE_URL = f"postgresql://postgres:{password}@{DB_HOST}:{DB_PORT}/app"
+if not DATABASE_URL:
+    # No full URL provided, construct from individual components
+    DB_PASSWORD_RAW = os.environ.get("DB_PASSWORD")
+    if not DB_PASSWORD_RAW:
+        raise ValueError(
+            "Either SQLALCHEMY_DATABASE_URL/DATABASE_URL or DB_PASSWORD must be set. "
+            "Please configure database connection in your .env file. "
+            "See .env.example for template."
+        )
 
-DATABASE_URL = os.environ.get(
-    "SQLALCHEMY_DATABASE_URL", 
-    DEFAULT_DATABASE_URL
-)
+    # URL-encode the password to handle special characters
+    password = quote_plus(DB_PASSWORD_RAW)
+
+    # Get database configuration from environment variables
+    DB_HOST = os.environ.get("DB_HOST", "localhost")
+    DB_PORT = os.environ.get("DB_PORT", "5432")  # Standard PostgreSQL port
+    DB_NAME = os.environ.get("DB_NAME", "app")
+    DB_USER = os.environ.get("DB_USER", "postgres")
+
+    # Construct the DATABASE_URL
+    DATABASE_URL = f"postgresql://{DB_USER}:{password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

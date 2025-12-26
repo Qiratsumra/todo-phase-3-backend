@@ -42,12 +42,13 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add CORS middleware to the application
+# SECURITY: Use parsed origins from environment, NOT wildcard
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Use the parsed origins
+    allow_origins=allowed_origins,  # Use the parsed origins from env
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Specific methods only
+    allow_headers=["*"],  # Can be more restrictive if needed
 )
 
 @app.on_event("startup")
