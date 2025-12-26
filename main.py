@@ -4,7 +4,6 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
-
 from slowapi.errors import RateLimitExceeded
 from service import router as api_router
 from routes.chat import router as chat_router
@@ -12,48 +11,60 @@ from database import create_tables
 from logging_config import configure_logging
 from dotenv import load_dotenv
 
-
 load_dotenv()
-# Configure logging at the application startup
 configure_logging()
 logger = logging.getLogger("app")
 
-# Rate limiting
 from limiter import limiter
 DEFAULT_RATE_LIMIT = "5/minute"
 RATE_LIMIT = os.getenv("BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT)
 
-# Default CORS origins
-DEFAULT_CORS_ORIGINS = '*'
+# CORS Configuration with explicit Vercel URL
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "https://todo-phase-3-frontend.vercel.app"
+]
 
-# Load CORS origins from environment variable
-cors_origins_str = os.environ.get("BACKEND_CORS_ORIGINS", DEFAULT_CORS_ORIGINS)
+cors_origins_str = os.environ.get("BACKEND_CORS_ORIGINS")
+if cors_origins_str:
+    try:
+        allowed_origins = json.loads(cors_origins_str.replace("'", '"'))
+        logger.info(f"Loaded CORS origins from env: {allowed_origins}")
+    except json.JSONDecodeError:
+        logger.warning(f"Could not parse BACKEND_CORS_ORIGINS: {cors_origins_str}")
+        allowed_origins = DEFAULT_CORS_ORIGINS
+else:
+    allowed_origins = DEFAULT_CORS_ORIGINS
 
-# The environment variable might be a single-quoted string, 
-# so we replace single quotes with double quotes for valid JSON.
-try:
-    allowed_origins = json.loads(cors_origins_str.replace("'", '"'))
-except json.JSONDecodeError:
-    logger.warning(f"Could not parse BACKEND_CORS_ORIGINS: {cors_origins_str}. Using default.")
-    allowed_origins = json.loads(DEFAULT_CORS_ORIGINS)
+logger.info(f"CORS allowed origins: {allowed_origins}")
 
 app = FastAPI()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Add CORS middleware to the application
-# SECURITY: Use parsed origins from environment, NOT wildcard
+# Enhanced CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Use the parsed origins from env
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Specific methods only
-    allow_headers=["*"],  # Can be more restrictive if needed
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],  # Add this
 )
+
+# Add request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Incoming request: {request.method} {request.url}")
+    logger.info(f"Origin: {request.headers.get('origin')}")
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    return response
 
 @app.on_event("startup")
 async def on_startup():
     create_tables()
+    logger.info("Application started successfully")
 
 @app.get("/")
 @limiter.limit(RATE_LIMIT)
