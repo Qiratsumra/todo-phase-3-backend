@@ -24,7 +24,7 @@ DEFAULT_RATE_LIMIT = "5/minute"
 RATE_LIMIT = os.getenv("BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT)
 
 # Default CORS origins
-DEFAULT_CORS_ORIGINS = '["http://localhost:3000"]'
+DEFAULT_CORS_ORIGINS = '*'
 
 # Load CORS origins from environment variable
 cors_origins_str = os.environ.get("BACKEND_CORS_ORIGINS", DEFAULT_CORS_ORIGINS)
@@ -45,7 +45,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # SECURITY: Use parsed origins from environment, NOT wildcard
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,  # Use the parsed origins from env
+    allow_origins=["*"],  # Use the parsed origins from env
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Specific methods only
     allow_headers=["*"],  # Can be more restrictive if needed
