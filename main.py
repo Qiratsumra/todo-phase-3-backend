@@ -19,10 +19,11 @@ from limiter import limiter
 DEFAULT_RATE_LIMIT = "5/minute"
 RATE_LIMIT = os.getenv("BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT)
 
-# CORS Configuration with explicit Vercel URL
+# CORS Configuration - Allow Vercel preview and production URLs
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
-    "https://todo-phase-3-frontend.vercel.app"
+    "https://todo-phase-3-frontend.vercel.app",
+    # This pattern will be checked in the middleware
 ]
 
 cors_origins_str = os.environ.get("BACKEND_CORS_ORIGINS")
@@ -42,17 +43,59 @@ app = FastAPI()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Enhanced CORS middleware
+# Custom CORS middleware to handle Vercel preview URLs
+@app.middleware("http")
+async def custom_cors_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    
+    # Check if origin is allowed
+    is_allowed = False
+    if origin:
+        # Allow localhost
+        if origin.startswith("http://localhost"):
+            is_allowed = True
+        # Allow production Vercel URL
+        elif origin == "https://todo-phase-3-frontend.vercel.app":
+            is_allowed = True
+        # Allow Vercel preview URLs (they contain .vercel.app)
+        elif origin.endswith(".vercel.app"):
+            is_allowed = True
+    
+    # Handle preflight requests
+    if request.method == "OPTIONS":
+        if is_allowed:
+            return Response(
+                content="",
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                },
+            )
+        return Response(content="", status_code=403)
+    
+    response = await call_next(request)
+    
+    # Add CORS headers to response
+    if is_allowed and origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+    
+    return response
+
+# Keep the standard CORS middleware as backup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
-    expose_headers=["*"],  # Add this
 )
 
-# Add request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     logger.info(f"Incoming request: {request.method} {request.url}")
