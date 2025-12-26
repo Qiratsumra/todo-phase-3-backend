@@ -3,6 +3,7 @@ import json
 import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from service import router as api_router
@@ -19,101 +20,51 @@ from limiter import limiter
 DEFAULT_RATE_LIMIT = "5/minute"
 RATE_LIMIT = os.getenv("BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT)
 
-# CORS Configuration - Allow Vercel preview and production URLs
-DEFAULT_CORS_ORIGINS = [
-    "http://localhost:3000",
-    "https://todo-phase-3-frontend.vercel.app",
-    # This pattern will be checked in the middleware
-]
-
-cors_origins_str = os.environ.get("BACKEND_CORS_ORIGINS")
-if cors_origins_str:
-    try:
-        allowed_origins = json.loads(cors_origins_str.replace("'", '"'))
-        logger.info(f"Loaded CORS origins from env: {allowed_origins}")
-    except json.JSONDecodeError:
-        logger.warning(f"Could not parse BACKEND_CORS_ORIGINS: {cors_origins_str}")
-        allowed_origins = DEFAULT_CORS_ORIGINS
-else:
-    allowed_origins = DEFAULT_CORS_ORIGINS
-
-logger.info(f"CORS allowed origins: {allowed_origins}")
-
-app = FastAPI()
+# CRITICAL: Disable automatic trailing slash redirects to prevent CORS issues
+app = FastAPI(redirect_slashes=False)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Custom CORS middleware to handle Vercel preview URLs
-@app.middleware("http")
-async def custom_cors_middleware(request: Request, call_next):
-    origin = request.headers.get("origin")
-    
-    # Check if origin is allowed
-    is_allowed = False
-    if origin:
-        # Allow localhost
-        if origin.startswith("http://localhost"):
-            is_allowed = True
-        # Allow production Vercel URL
-        elif origin == "https://todo-phase-3-frontend.vercel.app":
-            is_allowed = True
-        # Allow Vercel preview URLs (they contain .vercel.app)
-        elif origin.endswith(".vercel.app"):
-            is_allowed = True
-    
-    # Handle preflight requests
-    if request.method == "OPTIONS":
-        if is_allowed:
-            return Response(
-                content="",
-                status_code=200,
-                headers={
-                    "Access-Control-Allow-Origin": origin,
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                },
-            )
-        return Response(content="", status_code=403)
-    
-    response = await call_next(request)
-    
-    # Add CORS headers to response
-    if is_allowed and origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-    
-    return response
-
-# Keep the standard CORS middleware as backup
+# CORS Configuration - Allow all Vercel preview URLs and localhost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
+# Logging middleware to track requests
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    logger.info(f"Incoming request: {request.method} {request.url}")
-    logger.info(f"Origin: {request.headers.get('origin')}")
+    origin = request.headers.get('origin', 'No origin')
+    logger.info(f"📥 {request.method} {request.url.path} | Origin: {origin}")
+    
     response = await call_next(request)
-    logger.info(f"Response status: {response.status_code}")
+    
+    logger.info(f"📤 Status: {response.status_code}")
+    
+    # Add CORS headers to any redirects (just in case)
+    if response.status_code in (307, 308) and origin != 'No origin':
+        if origin.endswith('.vercel.app') or 'localhost' in origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            logger.info(f"✅ Added CORS headers to redirect response")
+    
     return response
 
 @app.on_event("startup")
 async def on_startup():
     create_tables()
-    logger.info("Application started successfully")
+    logger.info("🚀 Application started successfully")
+    logger.info(f"📍 CORS enabled for Vercel domains and localhost")
 
 @app.get("/")
 @limiter.limit(RATE_LIMIT)
 async def read_root(request: Request):
     """A simple health check endpoint."""
-    return {"status": "ok"}
+    return {"status": "ok", "message": "Todo API is running"}
 
 @app.get("/health")
 async def health_check():
@@ -143,6 +94,7 @@ async def system_status():
         )
     }
 
+# Include routers - these are added AFTER middleware
 app.include_router(api_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 
