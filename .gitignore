@@ -11,3 +11,8 @@ wheels/
 .env
 .env.local
 .env.example
+
+.env
+*.db
+__pycache__/
+*.pyc

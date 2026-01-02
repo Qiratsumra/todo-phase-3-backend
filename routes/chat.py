@@ -43,7 +43,7 @@ class ChatResponse(BaseModel):
     response: str
     tool_calls: List[Any] = []
     skill_used: Optional[str] = None
-    created_at: datetime
+    created_at: str  # Changed from datetime to ensure proper JSON serialization
 
 
 @router.post("/{user_id}/chat", response_model=ChatResponse)
@@ -129,7 +129,7 @@ async def chat(
             response=result.get("content", ""),
             tool_calls=result.get("tool_calls", []),
             skill_used=result.get("skill_used"),
-            created_at=assistant_message.created_at
+            created_at=assistant_message.created_at.isoformat() if assistant_message.created_at else ""
         )
 
     except HTTPException:
@@ -159,8 +159,8 @@ async def get_conversations(
         {
             "id": c.id,
             "user_id": c.user_id,
-            "created_at": c.created_at.isoformat() if c.created_at else None,
-            "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+            "created_at": c.created_at.isoformat() if c.created_at else "",
+            "updated_at": c.updated_at.isoformat() if c.updated_at else "",
             "message_count": len(c.messages) if c.messages else 0
         }
         for c in conversations
@@ -186,8 +186,8 @@ async def get_conversation_detail(
     return {
         "id": conversation.id,
         "user_id": conversation.user_id,
-        "created_at": conversation.created_at.isoformat() if conversation.created_at else None,
-        "updated_at": conversation.updated_at.isoformat() if conversation.updated_at else None,
+        "created_at": conversation.created_at.isoformat() if conversation.created_at else "",
+        "updated_at": conversation.updated_at.isoformat() if conversation.updated_at else "",
         "messages": [
             {
                 "id": m.id,
@@ -195,7 +195,7 @@ async def get_conversation_detail(
                 "content": m.content,
                 "skill_used": m.skill_used,
                 "tool_calls": m.tool_calls,
-                "created_at": m.created_at.isoformat() if m.created_at else None
+                "created_at": m.created_at.isoformat() if m.created_at else ""
             }
             for m in messages
         ]

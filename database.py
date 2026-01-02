@@ -32,7 +32,16 @@ if not DATABASE_URL:
     # Construct the DATABASE_URL
     DATABASE_URL = f"postgresql://{DB_USER}:{password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-engine = create_engine(DATABASE_URL)
+logger.info(f"Connecting to database: {DATABASE_URL.split('@')[-1]}") # Log host/port only for safety
+
+# Add connection timeouts to prevent hanging indefinitely
+# connect_timeout is in seconds for psycopg2
+engine = create_engine(
+    DATABASE_URL, 
+    connect_args={"connect_timeout": 10},
+    pool_pre_ping=True,
+    pool_recycle=3600
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():

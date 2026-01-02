@@ -8,7 +8,8 @@ This provides familiar API patterns while using Gemini's free tier.
 import os
 import logging
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI  # Changed from 'agents' to 'openai'
+
 load_dotenv()
 
 logger = logging.getLogger("agents")
@@ -23,8 +24,15 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.7"))
 GEMINI_MAX_TOKENS = int(os.getenv("GEMINI_MAX_TOKENS", "2048"))
 
+# Validate API key before initializing client
+if not GEMINI_API_KEY:
+    raise ValueError(
+        "GEMINI_API_KEY environment variable is not set. "
+        "Please set it in your .env file or environment."
+    )
+
 # Initialize OpenAI client with Gemini base URL
-client = OpenAI(
+client = AsyncOpenAI(
     api_key=GEMINI_API_KEY,
     base_url=GEMINI_BASE_URL
 )
@@ -53,7 +61,7 @@ def verify_gemini_config() -> bool:
     return True
 
 
-def get_chat_completion(
+async def get_chat_completion(  # Made async since using AsyncOpenAI
     messages: list,
     tools: list = None,
     temperature: float = None,
@@ -83,7 +91,7 @@ def get_chat_completion(
         kwargs["tool_choice"] = "auto"
 
     try:
-        response = client.chat.completions.create(**kwargs)
+        response = await client.chat.completions.create(**kwargs)  # Added await
         return response
     except Exception as e:
         logger.error(f"Gemini API error: {e}")

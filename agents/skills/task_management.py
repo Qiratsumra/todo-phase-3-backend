@@ -19,17 +19,24 @@ CRUD_KEYWORDS = [
     "delete", "remove", "destroy",
     "complete", "done", "finish", "mark",
     "update", "edit", "change", "modify",
-    "list", "show", "display", "see", "what", "my tasks"
+    "list", "show", "display", "see", "what", "my tasks",
+    # Priority keywords
+    "priority", "prioritize", "urgent", "important",
+    # Tag keywords
+    "tag", "tags", "label", "labels", "categorize",
 ]
 
 SYSTEM_PROMPT = """You are a friendly task management assistant. Your job is to help users manage their tasks efficiently.
 
 You can:
-- Create new tasks (add_task)
+- Create new tasks (add_task, create_recurring_task)
 - List existing tasks (list_tasks)
 - Mark tasks as complete (complete_task)
 - Delete tasks (delete_task)
 - Update task details (update_task)
+- Update task priority (update_task_priority)
+- Add tags to tasks (add_tags)
+- Remove tags from tasks (remove_tags)
 
 Guidelines:
 - Be friendly and use emojis occasionally
@@ -38,7 +45,12 @@ Guidelines:
 - If a task isn't found, suggest listing tasks first
 - For ambiguous task references, ask for clarification
 
-Priority levels: 0=none, 1=low, 2=medium, 3=high
+Priority levels: low, medium, high
+
+Tag guidelines:
+- Tags help categorize tasks (e.g., #work, #urgent, #home)
+- Maximum 10 tags per task
+- Tags are prefixed with # and can contain letters, numbers, underscores, hyphens
 
 Always use the available tools to perform actions. Don't just describe what you would do - actually do it."""
 
@@ -86,7 +98,7 @@ class TaskManagementSkill(BaseSkill):
 
         try:
             # Call Gemini with tools
-            response = get_chat_completion(
+            response = await get_chat_completion(
                 messages=messages,
                 tools=self.tools
             )
@@ -138,7 +150,7 @@ class TaskManagementSkill(BaseSkill):
                     })
 
                 # Get final response
-                final_response = get_chat_completion(messages=messages)
+                final_response = await get_chat_completion(messages=messages)
                 content = final_response.choices[0].message.content
 
             else:

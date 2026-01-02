@@ -79,7 +79,7 @@ class TaskSearchSkill(BaseSkill):
         tool_calls_made = []
 
         try:
-            response = get_chat_completion(
+            response = await get_chat_completion(
                 messages=messages,
                 tools=self.tools
             )
@@ -127,7 +127,7 @@ class TaskSearchSkill(BaseSkill):
                         "content": json.dumps(tool_calls_made[i]["result"])
                     })
 
-                final_response = get_chat_completion(messages=messages)
+                final_response = await get_chat_completion(messages=messages)
                 content = final_response.choices[0].message.content
             else:
                 content = assistant_message.content

@@ -1,4 +1,10 @@
 import os
+from dotenv import load_dotenv
+
+# Explicitly load .env from the same directory as main.py
+# CRITICAL: This must be loaded BEFORE any other imports that rely on env vars (like database.py)
+load_dotenv()
+
 import json
 import logging
 from fastapi import FastAPI, Request
@@ -8,11 +14,11 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from service import router as api_router
 from routes.chat import router as chat_router
+from routes.reminders import router as reminders_router
+from routes.jobs import router as jobs_router
 from database import create_tables
 from logging_config import configure_logging
-from dotenv import load_dotenv
 
-load_dotenv()
 configure_logging()
 logger = logging.getLogger("app")
 
@@ -21,14 +27,17 @@ DEFAULT_RATE_LIMIT = "5/minute"
 RATE_LIMIT = os.getenv("BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT)
 
 # CRITICAL: Disable automatic trailing slash redirects to prevent CORS issues
-app = FastAPI(redirect_slashes=False)
+app = FastAPI()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS Configuration - Allow all Vercel preview URLs and localhost
+origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:\d+",
+    allow_origins=origins,
+
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -97,7 +106,9 @@ async def system_status():
 # Include routers - these are added AFTER middleware
 app.include_router(api_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(reminders_router, prefix="/api")
+app.include_router(jobs_router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)# trigger reload
