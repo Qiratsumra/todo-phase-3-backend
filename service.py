@@ -564,7 +564,7 @@ class TaskService:
     # Recurrence Operations (US1)
     # ========================================================================
 
-    def complete_task(self, task_id: int, publish_event: bool = True) -> Dict[str, Any]:
+    async def complete_task(self, task_id: int, publish_event: bool = True) -> Dict[str, Any]:
         """Mark a task as completed and handle recurrence.
 
         For recurring tasks, automatically creates the next occurrence within 5 seconds.
@@ -582,7 +582,7 @@ class TaskService:
             if not task:
                 raise HTTPException(status_code=404, detail="Task not found")
 
-            if task.completed:
+            if task.status == TaskStatusEnum.COMPLETED:
                 return {
                     "success": False,
                     "error": "Task is already completed",
@@ -657,7 +657,7 @@ class TaskService:
             # Publish event to Kafka if requested
             event_published = False
             if publish_event:
-                event_published =  self._publish_task_completed_event(
+                event_published = await self._publish_task_completed_event(
                     task=task,
                     original_data=original_task_data,
                     is_recurring=is_recurring,
@@ -1006,7 +1006,7 @@ async def complete_task(
     Publishes task.completed event to Kafka unless disabled.
     """
     service = TaskService(db)
-    return service.complete_task(task_id, publish_event=publish_event)
+    return await service.complete_task(task_id, publish_event=publish_event)
 
 
 @router.get("/tasks/{task_id}/chain", response_model=List[Dict[str, Any]])
